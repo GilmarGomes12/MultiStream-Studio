@@ -1,0 +1,23 @@
+# Perfis de navegador isolados (evita vazar cookies/cache no repositório)
+profile/
+.profile/
+
+# Arquivos de Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs e temporários
+*.log
+*.tmp
+*.swp
+
+# Editores e IDEs
+.vscode/
+.idea/
+
+# Empacotadores opcionais (Nativefier / Node)
+node_modules/
+dist/
+build/
+MultiStreamHub-*/

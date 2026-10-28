@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#09090b">
+    <meta name="description" content="MultiStream Studio - Controle e Monitoramento de Transmissões Simultâneas do YouTube">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>MultiStream Hub - Monitor de Lives YouTube</title>
+
+    <!-- PWA Manifest & App Icons -->
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/svg+xml" href="./icon.svg">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        zinc: {
+                            850: '#1f1f23',
+                            925: '#121215',
+                            950: '#09090b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --grid-gap: 6px;
+            --focus-main-fr: 72fr;
+            --focus-side-fr: 28fr;
+        }
+
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* Responsive Grid Layouts */
+        .stream-grid {
+            display: grid;
+            gap: var(--grid-gap);
+            padding: var(--grid-gap);
+            width: 100%;
+            height: 100%;
+            transition: all 0.25s ease;
+        }
+
+        /* Layout 4 Telas (2x2) */
+        .layout-4 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            grid-auto-rows: 1fr;
+        }
+        @media (min-width: 768px) {
+            .layout-4 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        /* Layout 6 Telas (3x2) */
+        .layout-6 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            grid-auto-rows: 1fr;
+        }
+        @media (min-width: 640px) {
+            .layout-6 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-rows: repeat(3, minmax(0, 1fr));
+            }
+        }
+        @media (min-width: 1024px) {
+            .layout-6 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        /* Layout Modo Foco com Proporção Customizável */
+        .layout-focus-4, .layout-focus-6 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            grid-auto-rows: 1fr;
+        }
+        @media (min-width: 1024px) {
+            .layout-focus-4 {
+                grid-template-columns: var(--focus-main-fr) var(--focus-side-fr);
+                grid-template-rows: repeat(3, minmax(0, 1fr));
+            }
+            .layout-focus-4 .slot-card:nth-child(1) {
+                grid-column: 1 / 2;
+                grid-row: 1 / 4;
+            }
+
+            .layout-focus-6 {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) var(--focus-side-fr);
+                grid-template-rows: repeat(3, minmax(0, 1fr));
+            }
+            .layout-focus-6 .slot-card:nth-child(1) {
+                grid-column: 1 / 4;
+                grid-row: 1 / 3;
+            }
+        }
+
+        /* Mobile Scroll Fallback if too many screens on small height */
+        @media (max-width: 767px) {
+            body {
+                overflow-y: auto;
+            }
+            .stream-grid {
+                height: auto;
+                min-height: calc(100vh - 60px);
+            }
+            .slot-card {
+                min-height: 240px;
+            }
+        }
+
+        /* Active Audio Glow */
+        .audio-active-border {
+            box-shadow: 0 0 0 2px #10b981, 0 0 18px -2px rgba(16, 185, 129, 0.45);
+        }
+
+        /* Slot Header & Footer Overlay Transitions */
+        .slot-card .slot-overlay,
+        .slot-card .slot-bottom-overlay {
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .slot-card .slot-overlay {
+            transform: translateY(-4px);
+        }
+        .slot-card .slot-bottom-overlay {
+            transform: translateY(4px);
+        }
+        .slot-card:hover .slot-overlay,
+        .slot-card:hover .slot-bottom-overlay,
+        .slot-card.overlay-pinned .slot-overlay,
+        .slot-card.overlay-pinned .slot-bottom-overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Subtle persistent badge fades out on hover to avoid overlap */
+        .slot-card .persistent-badge {
+            opacity: 0.85;
+            transition: opacity 0.2s ease;
+        }
+        .slot-card:hover .persistent-badge {
+            opacity: 0;
+        }
+
+        /* Custom Range Input */
+        input[type="range"] {
+            accent-color: #10b981;
+        }
+
+        /* Pulse animation for LIVE dot */
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.15); }
+        }
+        .live-dot {
+            animation: pulse-red 2s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen w-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-emerald-500 selection:text-white">
+
+    <!-- TOP NAVIGATION / CONTROL BAR -->
+    <header id="top-bar" class="h-14 bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800 px-3 sm:px-4 flex items-center justify-between gap-2 z-30 shrink-0 transition-all duration-300">
+        <!-- Brand & Live Status -->
+        <div class="flex items-center gap-2.5 shrink-0">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center shadow-lg shadow-red-900/30">
+                <i class="fa-solid fa-tower-broadcast text-white text-sm"></i>
+            </div>
+            <div class="hidden sm:block">
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-sm tracking-tight text-white">MultiStream<span class="text-red-500">Studio</span></h1>
+                    <span id="active-counter" class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">0 Ativas</span>
+                </div>
+                <p class="text-[10px] text-zinc-400 leading-none">Controle de Transmissões Simultâneas</p>
+            </div>
+        </div>
+
+        <!-- Center Layout & Proportion Controls -->
+        <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                <button onclick="setGridLayout('4')" id="btn-layout-4" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all" title="Grade 2x2 (4 Telas)">
+                    <i class="fa-solid fa-table-cells-large"></i>
+                    <span>4 <span class="hidden md:inline">Telas</span></span>
+                </button>
+                <button onclick="setGridLayout('6')" id="btn-layout-6" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all" title="Grade 3x2 (6 Telas)">
+                    <i class="fa-solid fa-table-cells"></i>
+                    <span>6 <span class="hidden md:inline">Telas</span></span>
+                </button>
+                <button onclick="setGridLayout('focus')" id="btn-layout-focus" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all" title="Modo Foco (Atalho: F)">
+                    <i class="fa-solid fa-expand"></i>
+                    <span class="hidden sm:inline">Foco</span>
+                </button>
+            </div>
+
+            <!-- Proportions & Grid Settings Popover Button -->
+            <div class="relative">
+                <button onclick="togglePopover('layout-settings-popover')" class="p-2 rounded-xl text-xs font-medium bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 flex items-center gap-1.5 transition-all" title="Ajustar Proporção de Colunas e Espaçamento">
+                    <i class="fa-solid fa-sliders text-emerald-400"></i>
+                    <span class="hidden xl:inline text-[11px]">Proporção</span>
+                </button>
+
+                <!-- Dropdown Popover for Proportions & Gaps -->
+                <div id="layout-settings-popover" class="hidden absolute left-0 mt-2 w-72 bg-zinc-900 border border-zinc-700/90 rounded-2xl shadow-2xl p-4 z-50 space-y-4">
+                    <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+                        <span class="text-xs font-semibold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-ruler-combined text-emerald-400"></i> Ajuste de Grade & Colunas
+                        </span>
+                        <button onclick="togglePopover('layout-settings-popover')" class="text-zinc-400 hover:text-white text-xs">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- Focus Column Ratio -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[11px]">
+                            <span class="text-zinc-300 font-medium">Largura Principal (Modo Foco)</span>
+                            <span id="focus-ratio-label" class="text-emerald-400 font-semibold">72% / 28%</span>
+                        </div>
+                        <input type="range" id="focus-ratio-slider" min="55" max="85" step="5" value="72" oninput="updateFocusProportion(this.value)" class="w-full h-1.5 bg-zinc-800 rounded-lg cursor-pointer">
+                        <div class="grid grid-cols-4 gap-1 pt-1">
+                            <button onclick="updateFocusProportion(60)" class="px-2 py-1 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">60/40</button>
+                            <button onclick="updateFocusProportion(70)" class="px-2 py-1 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">70/30</button>
+                            <button onclick="updateFocusProportion(75)" class="px-2 py-1 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">75/25</button>
+                            <button onclick="updateFocusProportion(80)" class="px-2 py-1 text-[10px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">80/20</button>
+                        </div>
+                    </div>
+
+                    <!-- Grid Gap Size -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[11px]">
+                            <span class="text-zinc-300 font-medium">Espaçamento entre Telas</span>
+                            <span id="grid-gap-label" class="text-zinc-400">6px</span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1.5">
+                            <button onclick="updateGridGap(0)" id="gap-btn-0" class="px-2 py-1.5 text-[11px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">0px</button>
+                            <button onclick="updateGridGap(4)" id="gap-btn-4" class="px-2 py-1.5 text-[11px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">4px</button>
+                            <button onclick="updateGridGap(6)" id="gap-btn-6" class="px-2 py-1.5 text-[11px] rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/40">6px</button>
+                            <button onclick="updateGridGap(12)" id="gap-btn-12" class="px-2 py-1.5 text-[11px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700">12px</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Playback & Sync Controls -->
+        <div class="hidden lg:flex items-center gap-1.5 bg-zinc-950 px-2.5 py-1 rounded-xl border border-zinc-800">
+            <!-- Play / Pause All -->
+            <button onclick="togglePlayPauseAll()" id="btn-global-play" class="px-2 py-1 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 flex items-center gap-1.5 transition-colors" title="Pausar / Reproduzir Todas (Atalho: Espaço ou P)">
+                <i id="global-play-icon" class="fa-solid fa-pause text-amber-400 text-[11px]"></i>
+                <span id="global-play-text" class="text-[11px]">Pausar</span>
+            </button>
+
+            <div class="h-3.5 w-[1px] bg-zinc-800"></div>
+
+            <!-- Global Time Offset -->
+            <div class="flex items-center gap-0.5" title="Ajustar sincronia de tempo em todas as lives simultaneamente">
+                <button onclick="seekAllStreams(-5)" class="px-1.5 py-1 rounded hover:bg-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors">-5s</button>
+                <button onclick="seekAllStreams(-1)" class="px-1.5 py-1 rounded hover:bg-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors">-1s</button>
+                <button onclick="syncAllToLiveEdge()" class="px-2 py-1 rounded bg-red-600/15 hover:bg-red-600/30 text-red-400 border border-red-500/30 text-[10px] font-semibold flex items-center gap-1 transition-colors" title="Sincronizar todas no ponto AO VIVO">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 live-dot"></span>
+                    SYNC LIVE
+                </button>
+                <button onclick="seekAllStreams(1)" class="px-1.5 py-1 rounded hover:bg-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors">+1s</button>
+                <button onclick="seekAllStreams(5)" class="px-1.5 py-1 rounded hover:bg-zinc-800 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors">+5s</button>
+            </div>
+
+            <div class="h-3.5 w-[1px] bg-zinc-800"></div>
+
+            <!-- Solo Volume Slider -->
+            <div class="flex items-center gap-1.5 pl-1" title="Volume da transmissão Solo ativa">
+                <button onclick="muteAllStreams()" class="text-zinc-400 hover:text-red-400 text-xs transition-colors" title="Mutar Tudo (Atalho: M)">
+                    <i id="master-vol-icon" class="fa-solid fa-volume-high text-emerald-400"></i>
+                </button>
+                <input type="range" id="master-volume-slider" min="0" max="100" value="100" oninput="setSoloVolume(this.value)" class="w-16 h-1 bg-zinc-800 rounded-lg cursor-pointer">
+            </div>
+        </div>
+
+        <!-- Right Global Actions & Presets -->
+        <div class="flex items-center gap-1.5 shrink-0">
+            <!-- 1-Click PWA Install Button (Shown automatically when installable) -->
+            <button id="pwa-install-btn" onclick="installPWA()" class="hidden px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white border border-sky-500/40 items-center gap-1.5 transition-all shadow-sm" title="Instalar MultiStream Studio como Aplicativo (1 Clique)">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden xl:inline">Instalar App</span>
+            </button>
+
+            <!-- Quick Demo Load -->
+            <button onclick="loadDemoStreams()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 transition-all" title="Carregar lives 24/7 de exemplo para teste imediato">
+                <i class="fa-solid fa-bolt"></i>
+                <span class="hidden xl:inline">Lives Exemplo</span>
+            </button>
+
+            <!-- Presets Modal Button -->
+            <button onclick="openModal('presets-modal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-all" title="Salvar ou Carregar Presets de Canais">
+                <i class="fa-solid fa-bookmark text-amber-400"></i>
+                <span class="hidden md:inline">Presets</span>
+            </button>
+
+            <!-- Batch URL Paste -->
+            <button onclick="openModal('batch-modal')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-all" title="Colar múltiplos links de uma vez">
+                <i class="fa-solid fa-list-check text-sky-400"></i>
+                <span class="hidden 2xl:inline">Lote</span>
+            </button>
+
+            <!-- Keyboard Shortcuts Modal Button -->
+            <button onclick="openModal('shortcuts-modal')" class="p-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all" title="Atalhos de Teclado (Teclas 1-6, Espaço, M, Z, F)">
+                <i class="fa-regular fa-keyboard"></i>
+            </button>
+
+            <!-- Reload All -->
+            <button onclick="reloadAllStreams()" class="p-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition-all" title="Recarregar Todos os Players">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+
+            <!-- Clear All -->
+            <button onclick="confirmClearAll()" class="p-2 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-red-950/60 hover:text-red-400 text-zinc-300 border border-zinc-700 transition-all" title="Limpar Todas as Telas">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+
+            <!-- Zen Mode / Hide Topbar -->
+            <button onclick="toggleZenMode()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-all" title="Modo Zen / Tela Cheia (Atalho: Z)">
+                <i class="fa-solid fa-eye-slash"></i>
+                <span class="hidden 2xl:inline">Zen</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- FLOATING ZEN MODE EXIT BUTTON -->
+    <button id="zen-exit-btn" onclick="toggleZenMode()" class="hidden fixed top-3 right-3 z-50 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 rounded-full px-3.5 py-2 text-xs font-medium shadow-2xl backdrop-blur-md items-center gap-2 transition-all hover:scale-105 group">
+        <i class="fa-solid fa-eye text-emerald-400"></i>
+        <span>Mostrar Controles</span>
+        <span class="text-[10px] text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded group-hover:text-zinc-300">ESC</span>
+    </button>
+
+    <!-- MAIN WORKSPACE: GRID + OPTIONAL SIDEBAR CHAT -->
+    <main class="flex-1 flex overflow-hidden relative w-full h-full">
+        <!-- Video Grid Container -->
+        <div id="grid-container" class="stream-grid layout-4 flex-1">
+            <!-- Slots are dynamically rendered by JS -->
+        </div>
+
+        <!-- Collapsible Live Chat Drawer -->
+        <aside id="chat-drawer" class="hidden w-80 sm:w-96 bg-zinc-925 border-l border-zinc-800 flex-col h-full shrink-0 z-20">
+            <div class="h-10 px-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot"></span>
+                    <span id="chat-drawer-title" class="text-xs font-semibold text-zinc-200 truncate">Chat da Live</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <a id="chat-popout-link" href="#" target="_blank" rel="noopener noreferrer" class="p-1.5 text-zinc-400 hover:text-white text-xs rounded hover:bg-zinc-800 transition-colors" title="Abrir Chat em Nova Janela Pop-out">
+                        <i class="fa-solid fa-up-right-from-square"></i>
+                    </a>
+                    <button onclick="closeChatDrawer()" class="p-1.5 text-zinc-400 hover:text-red-400 text-xs rounded hover:bg-zinc-800 transition-colors" title="Fechar Chat">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 relative bg-zinc-950 flex flex-col">
+                <iframe id="chat-iframe" class="w-full flex-1 border-0" src="about:blank"></iframe>
+                <!-- Fallback info banner for local/sandboxed domains -->
+                <div class="p-2.5 bg-zinc-900/95 border-t border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between gap-2">
+                    <span>Caso o chat bloqueie o domínio local, use o pop-out:</span>
+                    <a id="chat-fallback-btn" href="#" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded font-medium shrink-0 border border-zinc-700">
+                        Abrir Pop-out <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- MODAL: PRESETS MANAGEMENT -->
+    <div id="presets-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-fade-in">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-bookmark text-amber-400"></i>
+                    <h2 class="font-semibold text-base text-white">Gerenciar Presets de Transmissão</h2>
+                </div>
+                <button onclick="closeModal('presets-modal')" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+                <!-- Save Current Grid as Preset -->
+                <div class="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800/80 space-y-2.5">
+                    <label class="block text-xs font-medium text-zinc-300">Salvar Grade Atual como Novo Preset</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-preset-name" placeholder="Ex: Plantão de Notícias, Monitoramento, Futebol..." class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+                        <button onclick="saveCurrentAsPreset()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors shrink-0 flex items-center gap-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Salvar Atual</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Built-in & Saved Presets List -->
+                <div class="space-y-2">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Seus Presets Salvos</h3>
+                    <div id="presets-list" class="space-y-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800 flex justify-end">
+                <button onclick="closeModal('presets-modal')" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: BATCH PASTE URLS -->
+    <div id="batch-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-list-check text-sky-400"></i>
+                    <h2 class="font-semibold text-base text-white">Carregar Links em Lote</h2>
+                </div>
+                <button onclick="closeModal('batch-modal')" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-3">
+                <p class="text-xs text-zinc-400">
+                    Cole até 6 links ou IDs de vídeos/lives do YouTube (um por linha). Eles preencherão as telas automaticamente na ordem:
+                </p>
+                <textarea id="batch-urls-input" rows="6" placeholder="https://www.youtube.com/watch?v=jfKfPfyJRdk&#10;https://www.youtube.com/live/21X5lGlDOfg&#10;https://youtu.be/xRPjKQtRXR8" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-100 font-mono placeholder-zinc-600 focus:outline-none focus:border-sky-500"></textarea>
+            </div>
+
+            <div class="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800 flex justify-end gap-2">
+                <button onclick="closeModal('batch-modal')" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Cancelar
+                </button>
+                <button onclick="applyBatchUrls()" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Carregar nas Telas</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT / CHANGE URL FOR SINGLE SLOT -->
+    <div id="edit-slot-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-youtube text-red-500 text-lg"></i>
+                    <h2 id="edit-slot-title" class="font-semibold text-sm text-white">Alterar Transmissão - Tela #1</h2>
+                </div>
+                <button onclick="closeModal('edit-slot-modal')" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1.5">Nome / Rótulo da Tela (Opcional)</label>
+                    <input type="text" id="edit-slot-label" placeholder="Ex: Câmera Principal, Canal 1..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-300 mb-1.5">Link ou ID do Vídeo/Live do YouTube</label>
+                    <input type="text" id="edit-slot-url" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+                    <p class="text-[11px] text-zinc-500 mt-1.5">Suporta links watch?v=, youtu.be/, /live/, /embed/ ou ID direto de 11 caracteres.</p>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800 flex justify-end gap-2">
+                <button onclick="closeModal('edit-slot-modal')" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Cancelar
+                </button>
+                <button onclick="saveEditedSlot()" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white">
+                    Salvar e Reproduzir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIRM CLEAR ALL -->
+    <div id="clear-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden p-5 space-y-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-sm text-white">Limpar todas as telas?</h3>
+                    <p class="text-xs text-zinc-400 mt-0.5">Isso removerá todos os vídeos abertos na grade atual.</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeModal('clear-modal')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Cancelar
+                </button>
+                <button onclick="clearAllSlots()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-500 text-white">
+                    Sim, Limpar Tudo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: KEYBOARD SHORTCUTS HELP -->
+    <div id="shortcuts-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-regular fa-keyboard text-emerald-400 text-lg"></i>
+                    <h2 class="font-semibold text-base text-white">Atalhos Rápidos de Estúdio</h2>
+                </div>
+                <button onclick="closeModal('shortcuts-modal')" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-2.5 text-xs">
+                <div class="flex items-center justify-between py-1.5 border-b border-zinc-800/80">
+                    <span class="text-zinc-300">Ouvir Áudio Solo (Tela 1 a 6)</span>
+                    <div class="flex gap-1">
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-emerald-400 font-mono font-semibold">1</kbd>
+                        <span class="text-zinc-500 self-center">até</span>
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-emerald-400 font-mono font-semibold">6</kbd>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-zinc-800/80">
+                    <span class="text-zinc-300">Promover Tela para Destaque (#1)</span>
+                    <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-amber-400 font-mono">Shift + 1..6</kbd>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-zinc-800/80">
+                    <span class="text-zinc-300">Mutar Todas as Transmissões</span>
+                    <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">M</kbd>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-zinc-800/80">
+                    <span class="text-zinc-300">Play / Pause em Todas as Telas</span>
+                    <div class="flex gap-1">
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">Espaço</kbd>
+                        <span class="text-zinc-500 self-center">ou</span>
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">P</kbd>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between py-1.5 border-b border-zinc-800/80">
+                    <span class="text-zinc-300">Alternar Modo Foco</span>
+                    <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">F</kbd>
+                </div>
+                <div class="flex items-center justify-between py-1.5">
+                    <span class="text-zinc-300">Alternar Modo Zen (Tela Cheia)</span>
+                    <div class="flex gap-1">
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">Z</kbd>
+                        <span class="text-zinc-500 self-center">ou</span>
+                        <kbd class="px-2 py-1 bg-zinc-950 border border-zinc-700 rounded text-zinc-200 font-mono">ESC</kbd>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800 flex justify-end">
+                <button onclick="closeModal('shortcuts-modal')" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Entendi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- YOUTUBE IFRAME API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <!-- APPLICATION SCRIPT -->
+    <script>
+        /**************************************************************
+         * PWA SERVICE WORKER & 1-CLICK INSTALL PROMPT
+         **************************************************************/
+        let deferredPwaPrompt = null;
+
+        if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch((err) => {
+                    console.warn('Aviso ao registrar Service Worker PWA:', err);
+                });
+            });
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPwaPrompt = e;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+                installBtn.classList.add('flex');
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPwaPrompt = null;
+            const installBtn = document.getElementById('pwa-install-btn');
+            if (installBtn) {
+                installBtn.classList.add('hidden');
+                installBtn.classList.remove('flex');
+            }
+            showToast('Aplicativo MultiStream Hub instalado com sucesso!', 'success');
+        });
+
+        async function installPWA() {
+            if (!deferredPwaPrompt) return;
+            deferredPwaPrompt.prompt();
+            const { outcome } = await deferredPwaPrompt.userChoice;
+            if (outcome === 'accepted') {
+                const installBtn = document.getElementById('pwa-install-btn');
+                if (installBtn) {
+                    installBtn.classList.add('hidden');
+                    installBtn.classList.remove('flex');
+                }
+            }
+            deferredPwaPrompt = null;
+        }
+
+        /**************************************************************
+         * STATE & CONSTANTS
+         **************************************************************/
+        const STORAGE_KEY_STATE = 'yt_multistream_state_v1';
+        const STORAGE_KEY_PRESETS = 'yt_multistream_presets_v1';
+
+        // Built-in 24/7 Live Streams for instant 1-click testing
+        const DEFAULT_DEMO_STREAMS = [
+            { videoId: 'jfKfPfyJRdk', label: 'Lofi Girl Radio 24/7' },
+            { videoId: 'xRPjKQtRXR8', label: 'NASA Live: Terra do Espaço' },
+            { videoId: '4E-iFtUM2kk', label: 'Times Square NYC - EarthCam' },
+            { videoId: '4xDzrJKXOOY', label: 'Synthwave Radio 24/7' },
+            { videoId: 'DjdUEyjx8GM', label: 'Shinjuku Kabukicho - Tóquio Live' },
+            { videoId: '5qap5aO4i9A', label: 'Lofi Beats / Chillhop' }
+        ];
+
+        const DEFAULT_PRESETS = [
+            {
+                id: 'preset_demo_247',
+                name: '🌐 Lives 24/7 (Lofi, NASA, Câmeras)',
+                layout: '4',
+                slots: [
+                    { videoId: 'jfKfPfyJRdk', label: 'Lofi Girl 24/7' },
+                    { videoId: 'xRPjKQtRXR8', label: 'NASA ISS Live' },
+                    { videoId: '4xDzrJKXOOY', label: 'Synthwave Radio' },
+                    { videoId: 'DjdUEyjx8GM', label: 'Tóquio Live Cam' },
+                    { videoId: '', label: 'Tela 5' },
+                    { videoId: '', label: 'Tela 6' }
+                ]
+            },
+            {
+                id: 'preset_6_cams',
+                name: '🎥 Monitoramento Global (6 Telas)',
+                layout: '6',
+                slots: [
+                    { videoId: 'jfKfPfyJRdk', label: 'Lofi Girl' },
+                    { videoId: 'xRPjKQtRXR8', label: 'NASA Espaço' },
+                    { videoId: 'DjdUEyjx8GM', label: 'Tóquio Japão' },
+                    { videoId: '4xDzrJKXOOY', label: 'Synthwave Chill' },
+                    { videoId: '4E-iFtUM2kk', label: 'Nova York Cam' },
+                    { videoId: 'rUxyKA_-grg', label: 'Ambient Space' }
+                ]
+            }
+        ];
+
+        let appState = {
+            layout: '4',          // '4' | '6' | 'focus'
+            lastBaseCount: 4,     // 4 or 6 (used when toggling focus mode)
+            focusMainRatio: 72,   // Main column percentage in focus mode (55 to 85)
+            gridGap: 6,           // Gap in px (0, 4, 6, 12)
+            soloVolume: 100,      // Volume for active solo stream (0 to 100)
+            allPaused: false,     // Tracks global play/pause state
+            zenMode: false,
+            soloSlotIndex: null,  // Index of stream currently unmuted in Solo mode
+            activeChatSlot: null, // Index of stream whose chat is open
+            slots: [
+                { videoId: '', label: 'Tela 1', muted: true, offsetSec: 0 },
+                { videoId: '', label: 'Tela 2', muted: true, offsetSec: 0 },
+                { videoId: '', label: 'Tela 3', muted: true, offsetSec: 0 },
+                { videoId: '', label: 'Tela 4', muted: true, offsetSec: 0 },
+                { videoId: '', label: 'Tela 5', muted: true, offsetSec: 0 },
+                { videoId: '', label: 'Tela 6', muted: true, offsetSec: 0 }
+            ]
+        };
+
+        // Map of slotIndex -> YT.Player instance
+        const ytPlayers = {};
+        let ytApiReady = false;
+        let editingSlotIndex = null;
+
+        /**************************************************************
+         * YOUTUBE API INITIALIZATION
+         **************************************************************/
+        function onYouTubeIframeAPIReady() {
+            ytApiReady = true;
+            initializeAllActivePlayers();
+        }
+
+        /**************************************************************
+         * SMART YOUTUBE URL PARSER
+         **************************************************************/
+        function extractYouTubeId(input) {
+            if (!input) return null;
+            const trimmed = input.trim();
+
+            // Direct 11-character video ID
+            if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+                return trimmed;
+            }
+
+            // Standard URL regex patterns (watch?v=, youtu.be/, /live/, /embed/, /shorts/)
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|live|shorts)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const match = trimmed.match(regex);
+            if (match && match[1]) {
+                return match[1];
+            }
+
+            return null;
+        }
+
+        /**************************************************************
+         * PERSISTENCE (localStorage)
+         **************************************************************/
+        function loadStateFromStorage() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY_STATE);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && Array.isArray(parsed.slots) && parsed.slots.length === 6) {
+                        appState.layout = parsed.layout || '4';
+                        appState.lastBaseCount = parsed.lastBaseCount || 4;
+                        appState.focusMainRatio = parsed.focusMainRatio || 72;
+                        appState.gridGap = typeof parsed.gridGap === 'number' ? parsed.gridGap : 6;
+                        appState.soloVolume = typeof parsed.soloVolume === 'number' ? parsed.soloVolume : 100;
+                        appState.slots = parsed.slots.map((s, idx) => ({
+                            videoId: s.videoId || '',
+                            label: s.label || `Tela ${idx + 1}`,
+                            muted: true,
+                            offsetSec: 0
+                        }));
+                    }
+                }
+            } catch (err) {
+                console.warn('Erro ao ler estado salvo no localStorage:', err);
+            }
+            applyCustomGridVariables();
+        }
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY_STATE, JSON.stringify({
+                    layout: appState.layout,
+                    lastBaseCount: appState.lastBaseCount,
+                    focusMainRatio: appState.focusMainRatio,
+                    gridGap: appState.gridGap,
+                    soloVolume: appState.soloVolume,
+                    slots: appState.slots
+                }));
+            } catch (err) {
+                console.warn('Erro ao salvar estado no localStorage:', err);
+            }
+        }
+
+        function getSavedPresets() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY_PRESETS);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('Erro ao carregar presets:', e);
+            }
+            return DEFAULT_PRESETS;
+        }
+
+        function savePresetsToStorage(presets) {
+            try {
+                localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
+            } catch (e) {
+                console.warn('Erro ao salvar presets:', e);
+            }
+        }
+
+        /**************************************************************
+         * GRID RENDERING & LAYOUT CONTROL
+         **************************************************************/
+        function getVisibleSlotCount() {
+            if (appState.layout === '4') return 4;
+            if (appState.layout === '6') return 6;
+            if (appState.layout === 'focus') return appState.lastBaseCount || 4;
+            return 4;
+        }
+
+        function setGridLayout(layoutType) {
+            if (layoutType === '4') {
+                appState.layout = '4';
+                appState.lastBaseCount = 4;
+            } else if (layoutType === '6') {
+                appState.layout = '6';
+                appState.lastBaseCount = 6;
+            } else if (layoutType === 'focus') {
+                appState.layout = 'focus';
+            }
+
+            saveStateToStorage();
+            updateLayoutButtonsUI();
+            renderGrid();
+        }
+
+        function updateLayoutButtonsUI() {
+            const buttons = {
+                '4': document.getElementById('btn-layout-4'),
+                '6': document.getElementById('btn-layout-6'),
+                'focus': document.getElementById('btn-layout-focus')
+            };
+
+            Object.keys(buttons).forEach(key => {
+                const btn = buttons[key];
+                if (!btn) return;
+                if (appState.layout === key) {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-red-600 text-white shadow-sm transition-all';
+                } else {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-all';
+                }
+            });
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('grid-container');
+            const visibleCount = getVisibleSlotCount();
+
+            // Apply Grid CSS Class
+            container.className = 'stream-grid flex-1 ';
+            if (appState.layout === '4') {
+                container.classList.add('layout-4');
+            } else if (appState.layout === '6') {
+                container.classList.add('layout-6');
+            } else if (appState.layout === 'focus') {
+                container.classList.add(visibleCount === 6 ? 'layout-focus-6' : 'layout-focus-4');
+            }
+
+            // Destroy players that are being re-rendered
+            Object.keys(ytPlayers).forEach(idx => {
+                try {
+                    if (ytPlayers[idx] && typeof ytPlayers[idx].destroy === 'function') {
+                        ytPlayers[idx].destroy();
+                    }
+                } catch (e) {}
+                delete ytPlayers[idx];
+            });
+
+            container.innerHTML = '';
+
+            for (let i = 0; i < visibleCount; i++) {
+                const slot = appState.slots[i];
+                const isSolo = appState.soloSlotIndex === i && !!slot.videoId;
+
+                const card = document.createElement('div');
+                card.id = `slot-card-${i}`;
+                card.className = `slot-card relative rounded-xl bg-zinc-900 border ${isSolo ? 'border-emerald-500 audio-active-border' : 'border-zinc-800/90'} overflow-hidden flex flex-col justify-between group transition-all`;
+
+                if (slot.videoId) {
+                    card.innerHTML = buildActiveSlotHTML(i, slot, isSolo);
+                } else {
+                    card.innerHTML = buildEmptySlotHTML(i, slot);
+                }
+
+                container.appendChild(card);
+            }
+
+            updateActiveCounter();
+
+            // Initialize YT Players on active slots
+            if (ytApiReady) {
+                initializeAllActivePlayers();
+            }
+        }
+
+        function buildActiveSlotHTML(index, slot, isSolo) {
+            const offsetLabel = slot.offsetSec
+                ? (slot.offsetSec > 0 ? `+${slot.offsetSec}s` : `${slot.offsetSec}s`)
+                : 'AO VIVO';
+
+            return `
+                <!-- Persistent Subtle Corner Badge (Visible when mouse is idle) -->
+                <div class="persistent-badge absolute top-2 left-2 z-10 pointer-events-none flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-sm border border-white/10">
+                    <span class="text-[10px] font-bold text-red-400">#${index + 1}</span>
+                    <span class="text-[10px] text-zinc-200 font-medium truncate max-w-[110px]">${escapeHtml(slot.label || `Tela ${index + 1}`)}</span>
+                    <span id="idle-audio-badge-${index}" class="text-[10px] ${isSolo ? 'text-emerald-400' : 'text-zinc-500'}">
+                        <i class="fa-solid ${isSolo ? 'fa-volume-high' : 'fa-volume-xmark'}"></i>
+                    </span>
+                </div>
+
+                <!-- Top Floating Control Bar (Appears on Hover) -->
+                <div class="slot-overlay absolute top-0 left-0 right-0 z-20 p-2 bg-gradient-to-b from-black/95 via-black/70 to-transparent flex items-center justify-between gap-2 pointer-events-auto">
+                    <!-- Left: Slot Badge & Label -->
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-600 text-white flex items-center gap-1 shrink-0" title="Atalho de teclado: Tecla ${index + 1}">
+                            <span class="w-1.5 h-1.5 rounded-full bg-white live-dot"></span>
+                            #${index + 1}
+                        </span>
+                        <span class="text-xs font-medium text-zinc-100 truncate" title="${escapeHtml(slot.label)}">
+                            ${escapeHtml(slot.label || `Tela ${index + 1}`)}
+                        </span>
+                        ${isSolo ? `
+                            <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shrink-0">
+                                <i class="fa-solid fa-volume-high text-[9px]"></i> Solo
+                            </span>
+                        ` : ''}
+                    </div>
+
+                    <!-- Right: Quick Slot Controls -->
+                    <div class="flex items-center gap-1 shrink-0">
+                        <!-- Solo Audio Button -->
+                        <button onclick="toggleSoloAudio(${index})" id="solo-btn-${index}" class="px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all ${isSolo ? 'bg-emerald-500 text-zinc-950 shadow-lg shadow-emerald-500/30' : 'bg-zinc-900/90 hover:bg-emerald-600 text-zinc-200 hover:text-white border border-zinc-700'}" title="Ouvir Apenas Esta Live (Atalho: Tecla ${index + 1})">
+                            <i class="fa-solid ${isSolo ? 'fa-volume-high' : 'fa-headphones'}"></i>
+                            <span class="hidden sm:inline">${isSolo ? 'Ouvindo' : 'Solo'}</span>
+                        </button>
+
+                        <!-- Promote to Main Focus (if not index 0) -->
+                        ${index !== 0 ? `
+                        <button onclick="promoteSlotToPrimary(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Destacar como Tela Principal #1 (Shift + ${index + 1})">
+                            <i class="fa-solid fa-star text-amber-400"></i>
+                        </button>
+                        ` : ''}
+
+                        <!-- Toggle Live Chat -->
+                        <button onclick="toggleSlotChat(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Abrir Chat desta Live">
+                            <i class="fa-regular fa-comment-dots"></i>
+                        </button>
+
+                        <!-- Edit URL / Label -->
+                        <button onclick="openEditSlotModal(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Trocar Link ou Nome da Tela">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+
+                        <!-- Reload Single Stream -->
+                        <button onclick="reloadSingleSlot(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Recarregar esta transmissão">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+
+                        <!-- Remove / Clear Slot -->
+                        <button onclick="clearSlot(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-red-600 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Fechar / Limpar Tela">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bottom Floating Sync / Delay Bar (Appears on Hover) -->
+                <div class="slot-bottom-overlay absolute bottom-10 left-2 z-20 pointer-events-auto flex items-center gap-1 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 px-2 py-1 rounded-lg shadow-lg">
+                    <span class="text-[10px] text-zinc-400 mr-1"><i class="fa-regular fa-clock"></i> Sync:</span>
+                    <button onclick="seekSingleSlot(${index}, -5)" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-200 transition-colors" title="Atrasar 5 segundos">-5s</button>
+                    <button onclick="seekSingleSlot(${index}, -1)" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-200 transition-colors" title="Atrasar 1 segundo">-1s</button>
+                    <button onclick="syncSingleSlotLive(${index})" id="offset-badge-${index}" class="px-1.5 py-0.5 rounded bg-red-600/20 hover:bg-red-600 text-[10px] font-semibold text-red-300 hover:text-white border border-red-500/30 transition-colors" title="Pular para a borda AO VIVO">
+                        ${offsetLabel}
+                    </button>
+                    <button onclick="seekSingleSlot(${index}, 1)" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-200 transition-colors" title="Avançar 1 segundo">+1s</button>
+                    <button onclick="seekSingleSlot(${index}, 5)" class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono text-zinc-200 transition-colors" title="Avançar 5 segundos">+5s</button>
+                </div>
+
+                <!-- YouTube Iframe Container -->
+                <div class="w-full h-full flex-1 bg-black relative">
+                    <div id="yt-player-${index}" class="w-full h-full"></div>
+                </div>
+            `;
+        }
+
+        function buildEmptySlotHTML(index, slot) {
+            return `
+                <div class="w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 text-center bg-gradient-to-b from-zinc-900/40 to-zinc-950/90 relative">
+                    <!-- Slot Number Badge -->
+                    <div class="absolute top-3 left-3 flex items-center gap-2">
+                        <span class="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-zinc-800/90 text-zinc-400 border border-zinc-700/70">
+                            Tela #${index + 1}
+                        </span>
+                    </div>
+
+                    <!-- Center Input Card -->
+                    <div class="max-w-sm w-full space-y-3">
+                        <div class="w-11 h-11 rounded-2xl bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center mx-auto text-zinc-400 group-hover:text-red-500 group-hover:border-red-500/30 transition-colors">
+                            <i class="fa-brands fa-youtube text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs sm:text-sm font-semibold text-zinc-200">Adicionar Live na Tela #${index + 1}</h3>
+                            <p class="text-[11px] text-zinc-500 mt-0.5">Cole o link do YouTube ou ID do vídeo abaixo</p>
+                        </div>
+
+                        <form onsubmit="handleSlotFormSubmit(event, ${index})" class="flex gap-1.5">
+                            <input 
+                                type="text" 
+                                id="slot-input-${index}"
+                                placeholder="https://youtube.com/watch?v=..." 
+                                class="flex-1 min-w-0 bg-zinc-950/90 border border-zinc-800 focus:border-red-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors"
+                            >
+                            <button 
+                                type="submit" 
+                                class="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg text-xs transition-colors flex items-center gap-1.5 shrink-0 shadow-lg shadow-red-950/50"
+                            >
+                                <i class="fa-solid fa-play text-[10px]"></i>
+                                <span>Abrir</span>
+                            </button>
+                        </form>
+
+                        <!-- Quick Sample Stream Pill -->
+                        <div class="pt-1 flex items-center justify-center gap-1.5 flex-wrap">
+                            <span class="text-[10px] text-zinc-500">Teste rápido:</span>
+                            <button onclick="quickFillSlot(${index})" type="button" class="text-[10px] px-2 py-0.5 rounded bg-zinc-800/70 hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400 border border-zinc-700/50 transition-colors">
+                                + Carregar ${DEFAULT_DEMO_STREAMS[index % DEFAULT_DEMO_STREAMS.length].label}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function initializeAllActivePlayers() {
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < visibleCount; i++) {
+                const slot = appState.slots[i];
+                if (slot.videoId) {
+                    createPlayerForSlot(i, slot.videoId);
+                }
+            }
+        }
+
+        function createPlayerForSlot(index, videoId) {
+            const targetEl = document.getElementById(`yt-player-${index}`);
+            if (!targetEl) return;
+
+            if (ytPlayers[index] && typeof ytPlayers[index].destroy === 'function') {
+                try { ytPlayers[index].destroy(); } catch (e) {}
+            }
+
+            const playerVars = {
+                autoplay: 1,
+                mute: 1,
+                playsinline: 1,
+                rel: 0,
+                modestbranding: 1,
+                enablejsapi: 1
+            };
+            if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                playerVars.origin = window.location.origin;
+            }
+
+            ytPlayers[index] = new YT.Player(`yt-player-${index}`, {
+                width: '100%',
+                height: '100%',
+                videoId: videoId,
+                playerVars: playerVars,
+                events: {
+                    onReady: (event) => {
+                        // If this slot is selected as Solo Audio, unmute it; otherwise keep muted
+                        if (appState.soloSlotIndex === index) {
+                            event.target.unMute();
+                            event.target.setVolume(appState.soloVolume);
+                        } else {
+                            event.target.mute();
+                        }
+                        if (!appState.allPaused) {
+                            event.target.playVideo();
+                        }
+                    },
+                    onError: (err) => {
+                        showToast(`Aviso: O vídeo da Tela #${index + 1} não permite reprodução embutida ou está indisponível.`, 'warning');
+                    }
+                }
+            });
+        }
+
+        /**************************************************************
+         * GLOBAL & INDIVIDUAL SYNC / PLAYBACK / PROPORTIONS
+         **************************************************************/
+        function applyCustomGridVariables() {
+            const mainFr = appState.focusMainRatio || 72;
+            const sideFr = 100 - mainFr;
+            document.documentElement.style.setProperty('--focus-main-fr', `${mainFr}fr`);
+            document.documentElement.style.setProperty('--focus-side-fr', `${sideFr}fr`);
+            document.documentElement.style.setProperty('--grid-gap', `${appState.gridGap}px`);
+
+            const ratioSlider = document.getElementById('focus-ratio-slider');
+            const ratioLabel = document.getElementById('focus-ratio-label');
+            if (ratioSlider) ratioSlider.value = mainFr;
+            if (ratioLabel) ratioLabel.textContent = `${mainFr}% / ${sideFr}%`;
+
+            const gapLabel = document.getElementById('grid-gap-label');
+            if (gapLabel) gapLabel.textContent = `${appState.gridGap}px`;
+
+            [0, 4, 6, 12].forEach(val => {
+                const btn = document.getElementById(`gap-btn-${val}`);
+                if (!btn) return;
+                if (val === appState.gridGap) {
+                    btn.className = 'px-2 py-1.5 text-[11px] rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 font-semibold';
+                } else {
+                    btn.className = 'px-2 py-1.5 text-[11px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700';
+                }
+            });
+
+            const volSlider = document.getElementById('master-volume-slider');
+            if (volSlider) volSlider.value = appState.soloVolume;
+        }
+
+        function updateFocusProportion(mainPercent) {
+            appState.focusMainRatio = parseInt(mainPercent, 10) || 72;
+            applyCustomGridVariables();
+            saveStateToStorage();
+            if (appState.layout !== 'focus') {
+                setGridLayout('focus');
+            }
+        }
+
+        function updateGridGap(gapPx) {
+            appState.gridGap = parseInt(gapPx, 10);
+            applyCustomGridVariables();
+            saveStateToStorage();
+        }
+
+        function togglePopover(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.toggle('hidden');
+        }
+
+        function togglePlayPauseAll() {
+            appState.allPaused = !appState.allPaused;
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < visibleCount; i++) {
+                const player = ytPlayers[i];
+                if (player) {
+                    try {
+                        if (appState.allPaused && typeof player.pauseVideo === 'function') {
+                            player.pauseVideo();
+                        } else if (!appState.allPaused && typeof player.playVideo === 'function') {
+                            player.playVideo();
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            const icon = document.getElementById('global-play-icon');
+            const text = document.getElementById('global-play-text');
+            if (icon && text) {
+                if (appState.allPaused) {
+                    icon.className = 'fa-solid fa-play text-emerald-400 text-[11px]';
+                    text.textContent = 'Play';
+                } else {
+                    icon.className = 'fa-solid fa-pause text-amber-400 text-[11px]';
+                    text.textContent = 'Pausar';
+                }
+            }
+
+            showToast(appState.allPaused ? '⏸ Todas as transmissões pausadas.' : '▶️ Reproduzindo todas as transmissões.', 'info');
+        }
+
+        function seekSingleSlot(index, deltaSeconds) {
+            const player = ytPlayers[index];
+            if (!player || typeof player.getCurrentTime !== 'function') return;
+            try {
+                const current = player.getCurrentTime() || 0;
+                const target = Math.max(0, current + deltaSeconds);
+                player.seekTo(target, true);
+
+                appState.slots[index].offsetSec = (appState.slots[index].offsetSec || 0) + deltaSeconds;
+                const badge = document.getElementById(`offset-badge-${index}`);
+                if (badge) {
+                    const off = appState.slots[index].offsetSec;
+                    badge.textContent = off === 0 ? 'AO VIVO' : (off > 0 ? `+${off}s` : `${off}s`);
+                }
+            } catch (e) {}
+        }
+
+        function syncSingleSlotLive(index) {
+            const player = ytPlayers[index];
+            if (!player) return;
+            try {
+                if (typeof player.getDuration === 'function') {
+                    const dur = player.getDuration();
+                    if (dur > 0) {
+                        player.seekTo(dur, true);
+                    }
+                }
+                player.playVideo();
+                appState.slots[index].offsetSec = 0;
+                const badge = document.getElementById(`offset-badge-${index}`);
+                if (badge) badge.textContent = 'AO VIVO';
+                showToast(`Tela #${index + 1} sincronizada no ponto AO VIVO.`, 'success');
+            } catch (e) {}
+        }
+
+        function seekAllStreams(deltaSeconds) {
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < visibleCount; i++) {
+                if (appState.slots[i].videoId) {
+                    seekSingleSlot(i, deltaSeconds);
+                }
+            }
+            const sign = deltaSeconds > 0 ? `+${deltaSeconds}s` : `${deltaSeconds}s`;
+            showToast(`Sincronia global ajustada em ${sign}.`, 'info');
+        }
+
+        function syncAllToLiveEdge() {
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < visibleCount; i++) {
+                if (appState.slots[i].videoId) {
+                    syncSingleSlotLive(i);
+                }
+            }
+            showToast('🔴 Todas as transmissões sincronizadas no ponto AO VIVO!', 'success');
+        }
+
+        function setSoloVolume(val) {
+            appState.soloVolume = parseInt(val, 10);
+            const icon = document.getElementById('master-vol-icon');
+            if (icon) {
+                if (appState.soloVolume === 0) {
+                    icon.className = 'fa-solid fa-volume-xmark text-red-400';
+                } else if (appState.soloVolume < 50) {
+                    icon.className = 'fa-solid fa-volume-low text-emerald-400';
+                } else {
+                    icon.className = 'fa-solid fa-volume-high text-emerald-400';
+                }
+            }
+
+            if (appState.soloSlotIndex !== null && ytPlayers[appState.soloSlotIndex]) {
+                try {
+                    const p = ytPlayers[appState.soloSlotIndex];
+                    if (appState.soloVolume === 0) {
+                        p.mute();
+                    } else {
+                        p.unMute();
+                        p.setVolume(appState.soloVolume);
+                    }
+                } catch (e) {}
+            }
+            saveStateToStorage();
+        }
+
+        /**************************************************************
+         * SLOT INTERACTIONS & AUDIO CONTROL
+         **************************************************************/
+        function handleSlotFormSubmit(event, index) {
+            event.preventDefault();
+            const inputEl = document.getElementById(`slot-input-${index}`);
+            if (!inputEl) return;
+
+            const videoId = extractYouTubeId(inputEl.value);
+            if (!videoId) {
+                showToast('Link ou ID do YouTube inválido. Verifique o endereço colado.', 'error');
+                inputEl.classList.add('border-red-500');
+                return;
+            }
+
+            appState.slots[index].videoId = videoId;
+            if (!appState.slots[index].label || appState.slots[index].label === `Tela ${index + 1}`) {
+                appState.slots[index].label = `Live #${index + 1}`;
+            }
+
+            saveStateToStorage();
+            renderGrid();
+            showToast(`Transmissão carregada na Tela #${index + 1}`, 'success');
+        }
+
+        function quickFillSlot(index) {
+            const sample = DEFAULT_DEMO_STREAMS[index % DEFAULT_DEMO_STREAMS.length];
+            appState.slots[index].videoId = sample.videoId;
+            appState.slots[index].label = sample.label;
+            saveStateToStorage();
+            renderGrid();
+            showToast(`${sample.label} adicionada na Tela #${index + 1}`, 'success');
+        }
+
+        function toggleSoloAudio(targetIndex) {
+            const isCurrentlySolo = appState.soloSlotIndex === targetIndex;
+
+            if (isCurrentlySolo) {
+                // Turn off solo (mute everything)
+                appState.soloSlotIndex = null;
+                muteAllStreams(false);
+                showToast(`Áudio da Tela #${targetIndex + 1} silenciado.`, 'info');
+            } else {
+                appState.soloSlotIndex = targetIndex;
+                const visibleCount = getVisibleSlotCount();
+                for (let i = 0; i < visibleCount; i++) {
+                    const player = ytPlayers[i];
+                    if (player && typeof player.mute === 'function') {
+                        try {
+                            if (i === targetIndex) {
+                                player.unMute();
+                                player.setVolume(appState.soloVolume || 100);
+                                player.playVideo();
+                            } else {
+                                player.mute();
+                            }
+                        } catch (e) {}
+                    }
+                }
+                showToast(`🔊 Ouvindo apenas: ${appState.slots[targetIndex].label || 'Tela #' + (targetIndex + 1)}`, 'success');
+            }
+
+            updateSoloVisualIndicators();
+        }
+
+        function updateSoloVisualIndicators() {
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < visibleCount; i++) {
+                const card = document.getElementById(`slot-card-${i}`);
+                const btn = document.getElementById(`solo-btn-${i}`);
+                const idleBadge = document.getElementById(`idle-audio-badge-${i}`);
+                if (!card) continue;
+
+                const isSolo = appState.soloSlotIndex === i && !!appState.slots[i].videoId;
+                if (isSolo) {
+                    card.classList.add('border-emerald-500', 'audio-active-border');
+                    card.classList.remove('border-zinc-800/90');
+                } else {
+                    card.classList.remove('border-emerald-500', 'audio-active-border');
+                    card.classList.add('border-zinc-800/90');
+                }
+
+                if (idleBadge) {
+                    idleBadge.className = `text-[10px] ${isSolo ? 'text-emerald-400' : 'text-zinc-500'}`;
+                    idleBadge.innerHTML = `<i class="fa-solid ${isSolo ? 'fa-volume-high' : 'fa-volume-xmark'}"></i>`;
+                }
+
+                if (btn) {
+                    if (isSolo) {
+                        btn.className = 'px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all bg-emerald-500 text-zinc-950 shadow-lg shadow-emerald-500/30';
+                        btn.innerHTML = `<i class="fa-solid fa-volume-high"></i><span class="hidden sm:inline">Ouvindo</span>`;
+                    } else {
+                        btn.className = 'px-2 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all bg-zinc-900/90 hover:bg-emerald-600 text-zinc-200 hover:text-white border border-zinc-700';
+                        btn.innerHTML = `<i class="fa-solid fa-headphones"></i><span class="hidden sm:inline">Solo</span>`;
+                    }
+                }
+            }
+        }
+
+        function muteAllStreams(notify = true) {
+            appState.soloSlotIndex = null;
+            Object.keys(ytPlayers).forEach(idx => {
+                const player = ytPlayers[idx];
+                if (player && typeof player.mute === 'function') {
+                    try { player.mute(); } catch (e) {}
+                }
+            });
+            updateSoloVisualIndicators();
+            if (notify) {
+                showToast('Todas as transmissões foram silenciadas.', 'info');
+            }
+        }
+
+        function reloadSingleSlot(index) {
+            const slot = appState.slots[index];
+            if (!slot || !slot.videoId) return;
+            createPlayerForSlot(index, slot.videoId);
+            showToast(`Recarregando Tela #${index + 1}...`, 'info');
+        }
+
+        function reloadAllStreams() {
+            renderGrid();
+            showToast('Todos os players foram recarregados.', 'info');
+        }
+
+        function clearSlot(index) {
+            if (appState.soloSlotIndex === index) {
+                appState.soloSlotIndex = null;
+            }
+            if (appState.activeChatSlot === index) {
+                closeChatDrawer();
+            }
+            appState.slots[index] = {
+                videoId: '',
+                label: `Tela ${index + 1}`,
+                muted: true
+            };
+            saveStateToStorage();
+            renderGrid();
+        }
+
+        function promoteSlotToPrimary(index) {
+            if (index === 0) return;
+            // Swap slot[0] and slot[index]
+            const temp = { ...appState.slots[0] };
+            appState.slots[0] = { ...appState.slots[index] };
+            appState.slots[index] = temp;
+
+            if (appState.soloSlotIndex === index) {
+                appState.soloSlotIndex = 0;
+            } else if (appState.soloSlotIndex === 0) {
+                appState.soloSlotIndex = index;
+            }
+
+            saveStateToStorage();
+            renderGrid();
+            showToast('Transmissão movida para a Tela Principal (#1).', 'success');
+        }
+
+        /**************************************************************
+         * EDIT SLOT MODAL
+         **************************************************************/
+        function openEditSlotModal(index) {
+            editingSlotIndex = index;
+            const slot = appState.slots[index];
+            document.getElementById('edit-slot-title').textContent = `Alterar Transmissão - Tela #${index + 1}`;
+            document.getElementById('edit-slot-label').value = slot.label || `Tela ${index + 1}`;
+            document.getElementById('edit-slot-url').value = slot.videoId ? `https://www.youtube.com/watch?v=${slot.videoId}` : '';
+            openModal('edit-slot-modal');
+        }
+
+        function saveEditedSlot() {
+            if (editingSlotIndex === null) return;
+            const labelInput = document.getElementById('edit-slot-label').value.trim();
+            const urlInput = document.getElementById('edit-slot-url').value.trim();
+
+            const videoId = extractYouTubeId(urlInput);
+            if (!videoId) {
+                showToast('Insira um link ou ID válido do YouTube.', 'error');
+                return;
+            }
+
+            appState.slots[editingSlotIndex].videoId = videoId;
+            appState.slots[editingSlotIndex].label = labelInput || `Tela ${editingSlotIndex + 1}`;
+
+            saveStateToStorage();
+            closeModal('edit-slot-modal');
+            renderGrid();
+            showToast(`Tela #${editingSlotIndex + 1} atualizada!`, 'success');
+        }
+
+        /**************************************************************
+         * LIVE CHAT DRAWER
+         **************************************************************/
+        function toggleSlotChat(index) {
+            const slot = appState.slots[index];
+            if (!slot || !slot.videoId) return;
+
+            const drawer = document.getElementById('chat-drawer');
+            const iframe = document.getElementById('chat-iframe');
+            const titleEl = document.getElementById('chat-drawer-title');
+            const popoutLink = document.getElementById('chat-popout-link');
+            const fallbackBtn = document.getElementById('chat-fallback-btn');
+
+            if (appState.activeChatSlot === index && !drawer.classList.contains('hidden')) {
+                closeChatDrawer();
+                return;
+            }
+
+            appState.activeChatSlot = index;
+            const domain = window.location.hostname || 'localhost';
+            const embedChatUrl = `https://www.youtube.com/live_chat?v=${slot.videoId}&embed_domain=${domain}&dark_theme=1`;
+            const popoutChatUrl = `https://www.youtube.com/live_chat?is_popout=1&v=${slot.videoId}`;
+
+            titleEl.textContent = `Chat: ${slot.label || 'Tela #' + (index + 1)}`;
+            iframe.src = embedChatUrl;
+            popoutLink.href = popoutChatUrl;
+            fallbackBtn.href = popoutChatUrl;
+
+            drawer.classList.remove('hidden');
+            drawer.classList.add('flex');
+        }
+
+        function closeChatDrawer() {
+            const drawer = document.getElementById('chat-drawer');
+            const iframe = document.getElementById('chat-iframe');
+            iframe.src = 'about:blank';
+            drawer.classList.add('hidden');
+            drawer.classList.remove('flex');
+            appState.activeChatSlot = null;
+        }
+
+        /**************************************************************
+         * PRESETS, DEMO STREAMS & BATCH LOAD
+         **************************************************************/
+        function loadDemoStreams() {
+            const visibleCount = getVisibleSlotCount();
+            for (let i = 0; i < 6; i++) {
+                const sample = DEFAULT_DEMO_STREAMS[i % DEFAULT_DEMO_STREAMS.length];
+                appState.slots[i] = {
+                    videoId: sample.videoId,
+                    label: sample.label,
+                    muted: true
+                };
+            }
+            saveStateToStorage();
+            renderGrid();
+            showToast(`${visibleCount} lives 24/7 carregadas com sucesso! Clique em "Solo" para ouvir.`, 'success');
+        }
+
+        function renderPresetsList() {
+            const listEl = document.getElementById('presets-list');
+            const presets = getSavedPresets();
+
+            if (presets.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-zinc-500 italic">Nenhum preset salvo.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = presets.map((preset, idx) => {
+                const activeCount = (preset.slots || []).filter(s => s.videoId).length;
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-all">
+                        <div class="min-w-0 pr-3">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-xs font-semibold text-zinc-100 truncate">${escapeHtml(preset.name)}</h4>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                    ${preset.layout === '6' ? '6 Telas' : preset.layout === 'focus' ? 'Modo Foco' : '4 Telas'} • ${activeCount} vídeos
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="applyPreset('${preset.id}')" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-lg text-xs font-medium transition-colors">
+                                Carregar
+                            </button>
+                            <button onclick="deletePreset('${preset.id}')" class="p-1.5 text-zinc-500 hover:text-red-400 rounded-lg hover:bg-zinc-900 transition-colors" title="Excluir Preset">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function saveCurrentAsPreset() {
+            const nameInput = document.getElementById('new-preset-name');
+            const name = nameInput.value.trim();
+            if (!name) {
+                showToast('Digite um nome para o Preset.', 'error');
+                return;
+            }
+
+            const presets = getSavedPresets();
+            const newPreset = {
+                id: 'preset_' + Date.now(),
+                name: name,
+                layout: appState.layout,
+                slots: JSON.parse(JSON.stringify(appState.slots))
+            };
+
+            presets.unshift(newPreset);
+            savePresetsToStorage(presets);
+            nameInput.value = '';
+            renderPresetsList();
+            showToast(`Preset "${name}" salvo com sucesso!`, 'success');
+        }
+
+        function applyPreset(presetId) {
+            const presets = getSavedPresets();
+            const found = presets.find(p => p.id === presetId);
+            if (!found) return;
+
+            appState.layout = found.layout || '4';
+            if (found.layout === '6') appState.lastBaseCount = 6;
+            if (found.layout === '4') appState.lastBaseCount = 4;
+
+            appState.slots = found.slots.map((s, idx) => ({
+                videoId: s.videoId || '',
+                label: s.label || `Tela ${idx + 1}`,
+                muted: true
+            }));
+            appState.soloSlotIndex = null;
+
+            saveStateToStorage();
+            updateLayoutButtonsUI();
+            renderGrid();
+            closeModal('presets-modal');
+            showToast(`Preset "${found.name}" carregado!`, 'success');
+        }
+
+        function deletePreset(presetId) {
+            let presets = getSavedPresets();
+            presets = presets.filter(p => p.id !== presetId);
+            savePresetsToStorage(presets);
+            renderPresetsList();
+            showToast('Preset removido.', 'info');
+        }
+
+        function applyBatchUrls() {
+            const rawText = document.getElementById('batch-urls-input').value;
+            const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+            if (lines.length === 0) {
+                showToast('Cole pelo menos um link válido do YouTube.', 'error');
+                return;
+            }
+
+            let validCount = 0;
+            for (let i = 0; i < Math.min(lines.length, 6); i++) {
+                const vid = extractYouTubeId(lines[i]);
+                if (vid) {
+                    appState.slots[i].videoId = vid;
+                    appState.slots[i].label = `Live #${i + 1}`;
+                    validCount++;
+                }
+            }
+
+            if (validCount === 0) {
+                showToast('Nenhum link válido do YouTube foi identificado.', 'error');
+                return;
+            }
+
+            if (validCount > 4 && appState.layout === '4') {
+                appState.layout = '6';
+                appState.lastBaseCount = 6;
+                updateLayoutButtonsUI();
+            }
+
+            saveStateToStorage();
+            renderGrid();
+            closeModal('batch-modal');
+            document.getElementById('batch-urls-input').value = '';
+            showToast(`${validCount} transmissões carregadas em lote!`, 'success');
+        }
+
+        /**************************************************************
+         * ZEN MODE / CLEAR ALL / UI HELPERS
+         **************************************************************/
+        function toggleZenMode() {
+            appState.zenMode = !appState.zenMode;
+            const topBar = document.getElementById('top-bar');
+            const exitBtn = document.getElementById('zen-exit-btn');
+
+            if (appState.zenMode) {
+                topBar.classList.add('hidden');
+                exitBtn.classList.remove('hidden');
+                exitBtn.classList.add('flex');
+                showToast('Modo Zen ativado. Pressione ESC para exibir a barra superior.', 'info');
+            } else {
+                topBar.classList.remove('hidden');
+                exitBtn.classList.add('hidden');
+                exitBtn.classList.remove('flex');
+            }
+        }
+
+        function confirmClearAll() {
+            openModal('clear-modal');
+        }
+
+        function clearAllSlots() {
+            appState.soloSlotIndex = null;
+            closeChatDrawer();
+            for (let i = 0; i < 6; i++) {
+                appState.slots[i] = {
+                    videoId: '',
+                    label: `Tela ${i + 1}`,
+                    muted: true
+                };
+            }
+            saveStateToStorage();
+            renderGrid();
+            closeModal('clear-modal');
+            showToast('Todas as telas foram limpas.', 'info');
+        }
+
+        function updateActiveCounter() {
+            const visibleCount = getVisibleSlotCount();
+            let active = 0;
+            for (let i = 0; i < visibleCount; i++) {
+                if (appState.slots[i].videoId) active++;
+            }
+            const badge = document.getElementById('active-counter');
+            if (badge) {
+                badge.textContent = `${active}/${visibleCount} Ativas`;
+                badge.className = active > 0
+                    ? 'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    : 'text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700';
+            }
+        }
+
+        function openModal(id) {
+            if (id === 'presets-modal') {
+                renderPresetsList();
+            }
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const colorClasses = {
+                success: 'bg-zinc-900 border-emerald-500/50 text-emerald-300',
+                error: 'bg-zinc-900 border-red-500/50 text-red-300',
+                warning: 'bg-zinc-900 border-amber-500/50 text-amber-300',
+                info: 'bg-zinc-900 border-zinc-700 text-zinc-200'
+            };
+
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-circle-xmark text-red-400',
+                warning: 'fa-triangle-exclamation text-amber-400',
+                info: 'fa-circle-info text-sky-400'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border shadow-xl text-xs font-medium backdrop-blur-md transition-all duration-300 ${colorClasses[type] || colorClasses.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type] || icons.info}"></i>
+                <span>${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        /**************************************************************
+         * KEYBOARD SHORTCUTS & LIFECYCLE
+         **************************************************************/
+        window.addEventListener('keydown', (e) => {
+            // Ignore shortcuts when typing inside inputs
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                if (e.key === 'Escape') {
+                    document.activeElement.blur();
+                }
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                if (appState.zenMode) {
+                    toggleZenMode();
+                }
+                ['presets-modal', 'batch-modal', 'edit-slot-modal', 'clear-modal', 'shortcuts-modal'].forEach(closeModal);
+                const pop = document.getElementById('layout-settings-popover');
+                if (pop) pop.classList.add('hidden');
+                return;
+            }
+
+            // Keys 1 to 6 or Shift + 1 to 6
+            if (['1', '2', '3', '4', '5', '6', '!', '@', '#', '$', '%', '¨'].includes(e.key) || (e.code && /^Digit[1-6]$/.test(e.code))) {
+                const digitMatch = e.code ? e.code.replace('Digit', '') : e.key;
+                const slotIdx = parseInt(digitMatch, 10) - 1;
+                const visibleCount = getVisibleSlotCount();
+                if (slotIdx >= 0 && slotIdx < visibleCount && appState.slots[slotIdx]?.videoId) {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        promoteSlotToPrimary(slotIdx);
+                    } else {
+                        toggleSoloAudio(slotIdx);
+                    }
+                }
+                return;
+            }
+
+            const keyLower = e.key.toLowerCase();
+            if (keyLower === 'm') {
+                e.preventDefault();
+                muteAllStreams();
+            } else if (keyLower === 'p' || e.code === 'Space') {
+                e.preventDefault();
+                togglePlayPauseAll();
+            } else if (keyLower === 'z') {
+                e.preventDefault();
+                toggleZenMode();
+            } else if (keyLower === 'f') {
+                e.preventDefault();
+                setGridLayout(appState.layout === 'focus' ? String(appState.lastBaseCount || 4) : 'focus');
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStateFromStorage();
+            updateLayoutButtonsUI();
+            renderGrid();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#09090b"/>
+      <stop offset="100%" stop-color="#18181b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect x="64" y="64" width="176" height="140" rx="20" fill="#18181b" stroke="#ef4444" stroke-width="10"/>
+  <polygon points="136,110 136,158 178,134" fill="#ef4444"/>
+  
+  <rect x="272" y="64" width="176" height="140" rx="20" fill="#18181b" stroke="#38bdf8" stroke-width="8"/>
+  <polygon points="344,110 344,158 386,134" fill="#38bdf8"/>
+
+  <rect x="64" y="232" width="176" height="140" rx="20" fill="#18181b" stroke="#10b981" stroke-width="8"/>
+  <polygon points="136,278 136,326 178,302" fill="#10b981"/>
+
+  <rect x="272" y="232" width="176" height="140" rx="20" fill="#18181b" stroke="#a855f7" stroke-width="8"/>
+  <polygon points="344,278 344,326 386,302" fill="#a855f7"/>
+
+  <rect x="136" y="408" width="240" height="44" rx="22" fill="url(#accent)"/>
+  <circle cx="176" cy="430" r="9" fill="#ffffff"/>
+  <text x="272" y="438" font-family="sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="2">MULTISTREAM</text>
+</svg>
