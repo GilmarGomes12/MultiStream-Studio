@@ -1115,6 +1115,11 @@
                             <i class="fa-regular fa-comment-dots"></i>
                         </button>
 
+                        <!-- Pop-out Native Player (Members-only / Restricted Embed Fallback) -->
+                        <button onclick="openSlotPopoutPlayer(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-amber-600 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Abrir Player Pop-out Nativo (Para Lives Exclusivas de Membros ou Bloqueadas em Embed)">
+                            <i class="fa-solid fa-up-right-from-square"></i>
+                        </button>
+
                         <!-- Edit URL / Label -->
                         <button onclick="openEditSlotModal(${index})" class="p-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 text-xs transition-colors" title="Trocar Link ou Nome da Tela">
                             <i class="fa-solid fa-pen"></i>
@@ -1147,6 +1152,35 @@
                 <!-- YouTube Iframe Container -->
                 <div class="w-full h-full flex-1 bg-black relative">
                     <div id="yt-player-${index}" class="w-full h-full"></div>
+
+                    <!-- Fallback Overlay for Members-Only / Embed-Restricted Streams -->
+                    <div id="slot-blocked-overlay-${index}" class="hidden absolute inset-0 z-10 bg-zinc-950/95 backdrop-blur-md flex-col items-center justify-center p-5 text-center">
+                        <div class="max-w-xs space-y-3">
+                            <div class="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                                <i class="fa-solid fa-crown text-lg"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs sm:text-sm font-semibold text-white">Live de Membros ou Bloqueada em Embed</h4>
+                                <p class="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                                    O YouTube bloqueia transmissões exclusivas de <strong>Membros do Canal</strong> dentro de players embutidos (<code class="text-zinc-300">/embed/</code>).
+                                </p>
+                            </div>
+                            <div class="flex flex-col gap-2 pt-1">
+                                <button onclick="openSlotPopoutPlayer(${index})" class="w-full px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40 transition-all">
+                                    <i class="fa-solid fa-up-right-from-square"></i>
+                                    <span>Abrir Player Pop-out Nativo</span>
+                                </button>
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="openModal('yt-login-modal')" class="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] border border-zinc-700 transition-colors">
+                                        <i class="fa-brands fa-youtube text-red-500 mr-1"></i>Login / Conta YT
+                                    </button>
+                                    <button onclick="hideSlotBlockedOverlay(${index})" class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] border border-zinc-800 transition-colors">
+                                        Ocultar Aviso
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -1248,10 +1282,54 @@
                         }
                     },
                     onError: (err) => {
-                        showToast(`Aviso: O vídeo da Tela #${index + 1} não permite reprodução embutida ou está indisponível.`, 'warning');
+                        const overlay = document.getElementById(`slot-blocked-overlay-${index}`);
+                        if (overlay) {
+                            overlay.classList.remove('hidden');
+                            overlay.classList.add('flex');
+                        }
+                        showToast(`Tela #${index + 1}: Live restrita (Membros) ou bloqueada em embed. Use o botão "Pop-out Nativo".`, 'warning');
                     }
                 }
             });
+        }
+
+        function hideSlotBlockedOverlay(index) {
+            const overlay = document.getElementById(`slot-blocked-overlay-${index}`);
+            if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            }
+        }
+
+        function openSlotPopoutPlayer(index) {
+            const slot = appState.slots[index];
+            if (!slot || !slot.videoId) return;
+
+            const card = document.getElementById(`slot-card-${index}`);
+            let width = 854;
+            let height = 480;
+            let left = Math.max(0, Math.round((window.screen.width - width) / 2));
+            let top = Math.max(0, Math.round((window.screen.height - height) / 2));
+
+            if (card) {
+                const rect = card.getBoundingClientRect();
+                if (rect.width > 200 && rect.height > 150) {
+                    width = Math.round(rect.width);
+                    height = Math.round(rect.height);
+                    left = Math.max(0, Math.round((window.screenX || window.screenLeft || 0) + rect.left));
+                    top = Math.max(0, Math.round((window.screenY || window.screenTop || 0) + rect.top + 30));
+                }
+            }
+
+            const watchUrl = `https://www.youtube.com/watch?v=${slot.videoId}`;
+            const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no,toolbar=no,menubar=no,location=no`;
+            const pop = window.open(watchUrl, `MultiStreamSlotPopout_${index}`, features);
+            if (!pop) {
+                showToast('Permita janelas pop-up para abrir o player nativo.', 'warning');
+                return;
+            }
+            try { pop.focus(); } catch (e) {}
+            showToast(`Tela #${index + 1} aberta em janela Pop-out nativa (suporta Membros).`, 'info');
         }
 
         /**************************************************************
