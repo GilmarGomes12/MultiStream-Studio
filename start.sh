@@ -23,14 +23,19 @@ fi
 # 2. Detecta navegador baseado em Chromium (Chrome, Brave, Edge, Chromium)
 if command -v google-chrome > /dev/null 2>&1; then
     BROWSER="google-chrome"
+    WM_CLASS="chrome-localhost__index.html-Default"
 elif command -v brave-browser > /dev/null 2>&1; then
     BROWSER="brave-browser"
+    WM_CLASS="brave-localhost__index.html-Default"
 elif command -v microsoft-edge > /dev/null 2>&1; then
     BROWSER="microsoft-edge"
+    WM_CLASS="msedge-localhost__index.html-Default"
 elif command -v chromium-browser > /dev/null 2>&1; then
     BROWSER="chromium-browser"
+    WM_CLASS="chromium-localhost__index.html-Default"
 elif command -v chromium > /dev/null 2>&1; then
     BROWSER="chromium"
+    WM_CLASS="chromium-localhost__index.html-Default"
 else
     notify-send "MultiStream Hub" "Nenhum navegador compatível (Chrome, Brave, Edge ou Chromium) encontrado." 2>/dev/null
     echo "Erro: Nenhum navegador baseado em Chromium encontrado." >&2
@@ -42,7 +47,7 @@ fi
 "$BROWSER" \
   --app="http://localhost:$PORT/index.html" \
   --user-data-dir="$PROFILE_DIR" \
-  --class="MultiStreamHub" \
+  --class="$WM_CLASS" \
   --window-size=1600,900 \
   --disable-features=ThirdPartyStoragePartitioning,TrackingProtection3pcd \
   --autoplay-policy=no-user-gesture-required > /dev/null 2>&1
