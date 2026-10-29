@@ -80,6 +80,18 @@
             transition: all 0.25s ease;
         }
 
+        /* Layout 2 Telas (2x1) */
+        .layout-2 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            grid-auto-rows: 1fr;
+        }
+        @media (min-width: 768px) {
+            .layout-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-rows: repeat(1, minmax(0, 1fr));
+            }
+        }
+
         /* Layout 4 Telas (2x2) */
         .layout-4 {
             grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -111,11 +123,20 @@
         }
 
         /* Layout Modo Foco com Proporção Customizável */
-        .layout-focus-4, .layout-focus-6 {
+        .layout-focus-2, .layout-focus-4, .layout-focus-6 {
             grid-template-columns: repeat(1, minmax(0, 1fr));
             grid-auto-rows: 1fr;
         }
         @media (min-width: 1024px) {
+            .layout-focus-2 {
+                grid-template-columns: var(--focus-main-fr) var(--focus-side-fr);
+                grid-template-rows: repeat(1, minmax(0, 1fr));
+            }
+            .layout-focus-2 .slot-card:nth-child(1) {
+                grid-column: 1 / 2;
+                grid-row: 1 / 2;
+            }
+
             .layout-focus-4 {
                 grid-template-columns: var(--focus-main-fr) var(--focus-side-fr);
                 grid-template-rows: repeat(3, minmax(0, 1fr));
@@ -219,6 +240,10 @@
         <!-- Center Layout & Proportion Controls -->
         <div class="flex items-center gap-1.5">
             <div class="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                <button onclick="setGridLayout('2')" id="btn-layout-2" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all" title="Grade 2x1 (2 Telas)">
+                    <i class="fa-solid fa-table-columns"></i>
+                    <span>2 <span class="hidden md:inline">Telas</span></span>
+                </button>
                 <button onclick="setGridLayout('4')" id="btn-layout-4" class="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all" title="Grade 2x2 (4 Telas)">
                     <i class="fa-solid fa-table-cells-large"></i>
                     <span>4 <span class="hidden md:inline">Telas</span></span>
@@ -324,6 +349,13 @@
                 <span class="hidden xl:inline">Instalar App</span>
             </button>
 
+            <!-- YouTube Account / Session Login Button -->
+            <button onclick="openModal('yt-login-modal')" id="yt-account-btn" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-all" title="Conectar Conta do YouTube (Chat ao Vivo, Membros & YouTube Premium)">
+                <i class="fa-brands fa-youtube text-red-500"></i>
+                <span id="yt-account-btn-text" class="hidden md:inline">Conta YT</span>
+                <span id="yt-account-dot" class="hidden w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            </button>
+
             <!-- Quick Demo Load -->
             <button onclick="loadDemoStreams()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 transition-all" title="Carregar lives 24/7 de exemplo para teste imediato">
                 <i class="fa-solid fa-bolt"></i>
@@ -387,6 +419,10 @@
                     <span id="chat-drawer-title" class="text-xs font-semibold text-zinc-200 truncate">Chat da Live</span>
                 </div>
                 <div class="flex items-center gap-1">
+                    <button onclick="openModal('yt-login-modal')" class="px-2 py-1 text-zinc-300 hover:text-white text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1" title="Fazer Login no YouTube para comentar no Chat">
+                        <i class="fa-brands fa-youtube text-red-500"></i>
+                        <span>Login</span>
+                    </button>
                     <a id="chat-popout-link" href="#" target="_blank" rel="noopener noreferrer" class="p-1.5 text-zinc-400 hover:text-white text-xs rounded hover:bg-zinc-800 transition-colors" title="Abrir Chat em Nova Janela Pop-out">
                         <i class="fa-solid fa-up-right-from-square"></i>
                     </a>
@@ -399,14 +435,106 @@
                 <iframe id="chat-iframe" class="w-full flex-1 border-0" src="about:blank"></iframe>
                 <!-- Fallback info banner for local/sandboxed domains -->
                 <div class="p-2.5 bg-zinc-900/95 border-t border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between gap-2">
-                    <span>Caso o chat bloqueie o domínio local, use o pop-out:</span>
-                    <a id="chat-fallback-btn" href="#" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded font-medium shrink-0 border border-zinc-700">
-                        Abrir Pop-out <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
-                    </a>
+                    <span>Caso o chat peça login ou bloqueie, use:</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="openYouTubeLoginPopup()" class="px-2 py-1 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded font-medium border border-red-500/30 transition-colors">
+                            Login YT
+                        </button>
+                        <a id="chat-fallback-btn" href="#" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded font-medium border border-zinc-700 transition-colors">
+                            Pop-out <i class="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </aside>
     </main>
+
+    <!-- MODAL: YOUTUBE ACCOUNT & SESSION LOGIN -->
+    <div id="yt-login-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-fade-in">
+            <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-red-600/15 border border-red-500/30 flex items-center justify-center text-red-500">
+                        <i class="fa-brands fa-youtube text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-semibold text-base text-white leading-tight">Conta do YouTube & Sessão</h2>
+                        <p class="text-[11px] text-zinc-400">Chat ao Vivo, Membros e YouTube Premium (Sem Anúncios)</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('yt-login-modal')" class="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+                <!-- Session Status Banner -->
+                <div id="yt-session-status-box" class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span id="yt-modal-status-dot" class="w-2.5 h-2.5 rounded-full bg-zinc-500 shrink-0"></span>
+                        <div>
+                            <div id="yt-modal-status-title" class="text-xs font-semibold text-zinc-200">Sessão não confirmada neste painel</div>
+                            <div id="yt-modal-status-desc" class="text-[11px] text-zinc-400">Faça login na janela pop-up oficial do Google/YouTube para autenticar seu perfil.</div>
+                        </div>
+                    </div>
+                    <button onclick="syncYouTubeSessionNow()" class="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 shrink-0 transition-colors" title="Recarregar players e chat para aplicar a sessão atual">
+                        <i class="fa-solid fa-rotate mr-1"></i> Aplicar nos Players
+                    </button>
+                </div>
+
+                <!-- Primary Login Actions -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button onclick="openYouTubeLoginPopup()" class="p-3.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-950/50 transition-all">
+                        <i class="fa-solid fa-right-to-bracket text-sm"></i>
+                        <span>Fazer Login no YouTube</span>
+                    </button>
+                    <button onclick="openYouTubeChannelSwitcher()" class="p-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-medium text-xs flex items-center justify-center gap-2 transition-all" title="Escolher qual Canal ou Conta de Marca usar no Chat">
+                        <i class="fa-solid fa-users-viewfinder text-emerald-400 text-sm"></i>
+                        <span>Trocar Canal / Conta</span>
+                    </button>
+                </div>
+
+                <!-- Waiting indicator when popup is open -->
+                <div id="yt-popup-waiting" class="hidden p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-xs items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-emerald-400"></i>
+                        <span>Janela de login aberta! Conclua o login e feche a janela para atualizar automaticamente.</span>
+                    </div>
+                </div>
+
+                <!-- How it works & Tips -->
+                <div class="bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800/80 space-y-2 text-[11px] text-zinc-400">
+                    <div class="font-semibold text-zinc-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-shield-halved text-sky-400"></i>
+                        <span>Como funciona a autenticação segura?</span>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 text-zinc-400 leading-relaxed">
+                        <li>O Google bloqueia senhas dentro de <code class="text-zinc-300">iframes</code> por segurança. O botão acima abre uma <strong>janela pop-up oficial</strong> do Google/YouTube.</li>
+                        <li>No <strong>Modo App (<code class="text-zinc-300">./start.sh</code> ou <code class="text-zinc-300">MultiStream.vbs</code>)</strong>, o login fica salvo permanentemente no perfil isolado do aplicativo e já ativa o <strong>YouTube Premium</strong> e o <strong>Chat ao Vivo</strong> em todas as telas.</li>
+                        <li>Se estiver usando navegador comum com bloqueio estrito de cookies de terceiros (ex: <em>Brave Shields</em>), desative o escudo para <code class="text-zinc-300">localhost</code> ou use o botão <strong>Pop-out</strong> no Chat.</li>
+                    </ul>
+                </div>
+
+                <!-- Secondary Actions -->
+                <div class="flex items-center justify-between pt-1 text-xs">
+                    <button onclick="openYouTubeAccountPopup()" class="text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        <span>Verificar conta ativa no YouTube</span>
+                    </button>
+                    <button onclick="openYouTubeLogoutPopup()" class="text-zinc-500 hover:text-red-400 flex items-center gap-1.5 transition-colors">
+                        <i class="fa-solid fa-right-from-bracket text-[10px]"></i>
+                        <span>Sair da conta (Logout)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-zinc-950/60 border-t border-zinc-800 flex justify-end">
+                <button onclick="closeModal('yt-login-modal')" class="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL: PRESETS MANAGEMENT -->
     <div id="presets-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
@@ -701,15 +829,16 @@
         ];
 
         let appState = {
-            layout: '4',          // '4' | '6' | 'focus'
-            lastBaseCount: 4,     // 4 or 6 (used when toggling focus mode)
-            focusMainRatio: 72,   // Main column percentage in focus mode (55 to 85)
-            gridGap: 6,           // Gap in px (0, 4, 6, 12)
-            soloVolume: 100,      // Volume for active solo stream (0 to 100)
-            allPaused: false,     // Tracks global play/pause state
+            layout: '4',               // '2' | '4' | '6' | 'focus'
+            lastBaseCount: 4,          // 2, 4 or 6 (used when toggling focus mode)
+            focusMainRatio: 72,        // Main column percentage in focus mode (55 to 85)
+            gridGap: 6,                // Gap in px (0, 4, 6, 12)
+            soloVolume: 100,           // Volume for active solo stream (0 to 100)
+            ytSessionConnected: false, // Tracks if user authenticated YouTube in this profile
+            allPaused: false,          // Tracks global play/pause state
             zenMode: false,
-            soloSlotIndex: null,  // Index of stream currently unmuted in Solo mode
-            activeChatSlot: null, // Index of stream whose chat is open
+            soloSlotIndex: null,       // Index of stream currently unmuted in Solo mode
+            activeChatSlot: null,      // Index of stream whose chat is open
             slots: [
                 { videoId: '', label: 'Tela 1', muted: true, offsetSec: 0 },
                 { videoId: '', label: 'Tela 2', muted: true, offsetSec: 0 },
@@ -724,6 +853,7 @@
         const ytPlayers = {};
         let ytApiReady = false;
         let editingSlotIndex = null;
+        let ytAuthPopupTimer = null;
 
         /**************************************************************
          * YOUTUBE API INITIALIZATION
@@ -765,10 +895,11 @@
                     const parsed = JSON.parse(raw);
                     if (parsed && Array.isArray(parsed.slots) && parsed.slots.length === 6) {
                         appState.layout = parsed.layout || '4';
-                        appState.lastBaseCount = parsed.lastBaseCount || 4;
+                        appState.lastBaseCount = parsed.lastBaseCount || (parsed.layout === '2' ? 2 : parsed.layout === '6' ? 6 : 4);
                         appState.focusMainRatio = parsed.focusMainRatio || 72;
                         appState.gridGap = typeof parsed.gridGap === 'number' ? parsed.gridGap : 6;
                         appState.soloVolume = typeof parsed.soloVolume === 'number' ? parsed.soloVolume : 100;
+                        appState.ytSessionConnected = !!parsed.ytSessionConnected;
                         appState.slots = parsed.slots.map((s, idx) => ({
                             videoId: s.videoId || '',
                             label: s.label || `Tela ${idx + 1}`,
@@ -781,6 +912,7 @@
                 console.warn('Erro ao ler estado salvo no localStorage:', err);
             }
             applyCustomGridVariables();
+            updateYouTubeAccountUI();
         }
 
         function saveStateToStorage() {
@@ -791,6 +923,7 @@
                     focusMainRatio: appState.focusMainRatio,
                     gridGap: appState.gridGap,
                     soloVolume: appState.soloVolume,
+                    ytSessionConnected: appState.ytSessionConnected,
                     slots: appState.slots
                 }));
             } catch (err) {
@@ -825,6 +958,7 @@
          * GRID RENDERING & LAYOUT CONTROL
          **************************************************************/
         function getVisibleSlotCount() {
+            if (appState.layout === '2') return 2;
             if (appState.layout === '4') return 4;
             if (appState.layout === '6') return 6;
             if (appState.layout === 'focus') return appState.lastBaseCount || 4;
@@ -832,7 +966,10 @@
         }
 
         function setGridLayout(layoutType) {
-            if (layoutType === '4') {
+            if (layoutType === '2') {
+                appState.layout = '2';
+                appState.lastBaseCount = 2;
+            } else if (layoutType === '4') {
                 appState.layout = '4';
                 appState.lastBaseCount = 4;
             } else if (layoutType === '6') {
@@ -849,6 +986,7 @@
 
         function updateLayoutButtonsUI() {
             const buttons = {
+                '2': document.getElementById('btn-layout-2'),
                 '4': document.getElementById('btn-layout-4'),
                 '6': document.getElementById('btn-layout-6'),
                 'focus': document.getElementById('btn-layout-focus')
@@ -871,12 +1009,20 @@
 
             // Apply Grid CSS Class
             container.className = 'stream-grid flex-1 ';
-            if (appState.layout === '4') {
+            if (appState.layout === '2') {
+                container.classList.add('layout-2');
+            } else if (appState.layout === '4') {
                 container.classList.add('layout-4');
             } else if (appState.layout === '6') {
                 container.classList.add('layout-6');
             } else if (appState.layout === 'focus') {
-                container.classList.add(visibleCount === 6 ? 'layout-focus-6' : 'layout-focus-4');
+                if (visibleCount === 2) {
+                    container.classList.add('layout-focus-2');
+                } else if (visibleCount === 6) {
+                    container.classList.add('layout-focus-6');
+                } else {
+                    container.classList.add('layout-focus-4');
+                }
             }
 
             // Destroy players that are being re-rendered
@@ -1507,6 +1653,142 @@
             appState.activeChatSlot = null;
         }
 
+        function refreshActiveChat() {
+            if (appState.activeChatSlot === null) return;
+            const slot = appState.slots[appState.activeChatSlot];
+            const iframe = document.getElementById('chat-iframe');
+            if (slot && slot.videoId && iframe) {
+                const domain = window.location.hostname || 'localhost';
+                iframe.src = `https://www.youtube.com/live_chat?v=${slot.videoId}&embed_domain=${domain}&dark_theme=1&t=${Date.now()}`;
+            }
+        }
+
+        /**************************************************************
+         * YOUTUBE ACCOUNT & SESSION LOGIN (POPUP FLOW)
+         **************************************************************/
+        function updateYouTubeAccountUI() {
+            const btn = document.getElementById('yt-account-btn');
+            const btnText = document.getElementById('yt-account-btn-text');
+            const dot = document.getElementById('yt-account-dot');
+            const modalDot = document.getElementById('yt-modal-status-dot');
+            const modalTitle = document.getElementById('yt-modal-status-title');
+            const modalDesc = document.getElementById('yt-modal-status-desc');
+
+            if (appState.ytSessionConnected) {
+                if (btn) {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 transition-all';
+                }
+                if (btnText) btnText.textContent = 'Conta YT';
+                if (dot) dot.classList.remove('hidden');
+                if (modalDot) modalDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 live-dot shrink-0';
+                if (modalTitle) {
+                    modalTitle.textContent = 'Sessão do YouTube Ativa neste Perfil';
+                    modalTitle.className = 'text-xs font-semibold text-emerald-300';
+                }
+                if (modalDesc) {
+                    modalDesc.textContent = 'Seus players e o Chat ao Vivo utilizam os cookies de sessão autenticados neste navegador.';
+                }
+            } else {
+                if (btn) {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-all';
+                }
+                if (btnText) btnText.textContent = 'Login YT';
+                if (dot) dot.classList.add('hidden');
+                if (modalDot) modalDot.className = 'w-2.5 h-2.5 rounded-full bg-zinc-500 shrink-0';
+                if (modalTitle) {
+                    modalTitle.textContent = 'Sessão não confirmada neste painel';
+                    modalTitle.className = 'text-xs font-semibold text-zinc-200';
+                }
+                if (modalDesc) {
+                    modalDesc.textContent = 'Faça login na janela pop-up oficial do Google/YouTube para autenticar seu perfil.';
+                }
+            }
+        }
+
+        function openYouTubePopupWindow(url, title = 'YouTubeAuthPopup', onClosedCallback = null) {
+            const width = 540;
+            const height = 680;
+            const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+            const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+            const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=yes`;
+
+            const popup = window.open(url, title, features);
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                showToast('O navegador bloqueou a janela pop-up. Permita pop-ups para este site.', 'warning');
+                return null;
+            }
+
+            try { popup.focus(); } catch (e) {}
+
+            const waitingBanner = document.getElementById('yt-popup-waiting');
+            if (waitingBanner) {
+                waitingBanner.classList.remove('hidden');
+                waitingBanner.classList.add('flex');
+            }
+
+            if (ytAuthPopupTimer) clearInterval(ytAuthPopupTimer);
+            ytAuthPopupTimer = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(ytAuthPopupTimer);
+                    ytAuthPopupTimer = null;
+                    if (waitingBanner) {
+                        waitingBanner.classList.add('hidden');
+                        waitingBanner.classList.remove('flex');
+                    }
+                    if (typeof onClosedCallback === 'function') {
+                        onClosedCallback();
+                    }
+                }
+            }, 600);
+
+            return popup;
+        }
+
+        function openYouTubeLoginPopup() {
+            const loginUrl = 'https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&hl=pt-BR&continue=' + encodeURIComponent('https://www.youtube.com/');
+            openYouTubePopupWindow(loginUrl, 'YouTubeLogin', () => {
+                syncYouTubeSessionNow(true);
+            });
+        }
+
+        function openYouTubeChannelSwitcher() {
+            const switcherUrl = 'https://www.youtube.com/channel_switcher';
+            openYouTubePopupWindow(switcherUrl, 'YouTubeChannelSwitcher', () => {
+                syncYouTubeSessionNow(true);
+            });
+        }
+
+        function openYouTubeAccountPopup() {
+            const accountUrl = 'https://www.youtube.com/account';
+            openYouTubePopupWindow(accountUrl, 'YouTubeAccount', () => {
+                syncYouTubeSessionNow(false);
+            });
+        }
+
+        function openYouTubeLogoutPopup() {
+            const logoutUrl = 'https://www.youtube.com/logout';
+            openYouTubePopupWindow(logoutUrl, 'YouTubeLogout', () => {
+                appState.ytSessionConnected = false;
+                saveStateToStorage();
+                updateYouTubeAccountUI();
+                renderGrid();
+                refreshActiveChat();
+                showToast('Sessão do YouTube desconectada e players recarregados.', 'info');
+            });
+        }
+
+        function syncYouTubeSessionNow(closeLoginModal = false) {
+            appState.ytSessionConnected = true;
+            saveStateToStorage();
+            updateYouTubeAccountUI();
+            renderGrid();
+            refreshActiveChat();
+            if (closeLoginModal) {
+                closeModal('yt-login-modal');
+            }
+            showToast('Sessão do YouTube sincronizada! Players e Chat atualizados.', 'success');
+        }
+
         /**************************************************************
          * PRESETS, DEMO STREAMS & BATCH LOAD
          **************************************************************/
@@ -1536,13 +1818,20 @@
 
             listEl.innerHTML = presets.map((preset, idx) => {
                 const activeCount = (preset.slots || []).filter(s => s.videoId).length;
+                const layoutLabel = preset.layout === '2'
+                    ? '2 Telas'
+                    : preset.layout === '6'
+                        ? '6 Telas'
+                        : preset.layout === 'focus'
+                            ? 'Modo Foco'
+                            : '4 Telas';
                 return `
                     <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-all">
                         <div class="min-w-0 pr-3">
                             <div class="flex items-center gap-2">
                                 <h4 class="text-xs font-semibold text-zinc-100 truncate">${escapeHtml(preset.name)}</h4>
                                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                                    ${preset.layout === '6' ? '6 Telas' : preset.layout === 'focus' ? 'Modo Foco' : '4 Telas'} • ${activeCount} vídeos
+                                    ${layoutLabel} • ${activeCount} vídeos
                                 </span>
                             </div>
                         </div>
@@ -1588,8 +1877,9 @@
             if (!found) return;
 
             appState.layout = found.layout || '4';
-            if (found.layout === '6') appState.lastBaseCount = 6;
+            if (found.layout === '2') appState.lastBaseCount = 2;
             if (found.layout === '4') appState.lastBaseCount = 4;
+            if (found.layout === '6') appState.lastBaseCount = 6;
 
             appState.slots = found.slots.map((s, idx) => ({
                 videoId: s.videoId || '',
@@ -1637,9 +1927,13 @@
                 return;
             }
 
-            if (validCount > 4 && appState.layout === '4') {
+            if (validCount > 4 && (appState.layout === '2' || appState.layout === '4')) {
                 appState.layout = '6';
                 appState.lastBaseCount = 6;
+                updateLayoutButtonsUI();
+            } else if (validCount > 2 && appState.layout === '2') {
+                appState.layout = '4';
+                appState.lastBaseCount = 4;
                 updateLayoutButtonsUI();
             }
 
@@ -1708,6 +2002,8 @@
         function openModal(id) {
             if (id === 'presets-modal') {
                 renderPresetsList();
+            } else if (id === 'yt-login-modal') {
+                updateYouTubeAccountUI();
             }
             const modal = document.getElementById(id);
             if (modal) {
@@ -1783,7 +2079,7 @@
                 if (appState.zenMode) {
                     toggleZenMode();
                 }
-                ['presets-modal', 'batch-modal', 'edit-slot-modal', 'clear-modal', 'shortcuts-modal'].forEach(closeModal);
+                ['yt-login-modal', 'presets-modal', 'batch-modal', 'edit-slot-modal', 'clear-modal', 'shortcuts-modal'].forEach(closeModal);
                 const pop = document.getElementById('layout-settings-popover');
                 if (pop) pop.classList.add('hidden');
                 return;

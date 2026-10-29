@@ -6,7 +6,8 @@ Painel leve e moderno para **monitoramento simultâneo de transmissões ao vivo 
 
 ## ✨ Principais Recursos
 
-- **Grades Responsivas**: Alterne entre **4 Telas (2x2)**, **6 Telas (3x2)** e **Modo Foco** (1 tela principal em destaque + telas auxiliares com proporção de colunas ajustável de `55/45` a `85/15`).
+- **Grades Responsivas**: Alterne entre **2 Telas (2x1)**, **4 Telas (2x2)**, **6 Telas (3x2)** e **Modo Foco** (1 tela principal em destaque + telas auxiliares com proporção de colunas ajustável de `55/45` a `85/15`).
+- **Login / Conta do YouTube Integrada**: Autentique sua conta em janela pop-up oficial do Google para participar do **Chat ao Vivo**, assistir lives exclusivas para membros e aproveitar o **YouTube Premium (sem anúncios)** diretamente no perfil isolado do app.
 - **Áudio Solo Inteligente (1 Clique ou Teclas `1` a `6`)**: Ouça apenas a transmissão selecionada enquanto todas as outras são silenciadas automaticamente, sem recarregar o player.
 - **Sincronização de Delay (`Sync Live`)**: Ajuste o atraso individual ou global das transmissões (`-5s`, `-1s`, `+1s`, `+5s`) ou sincronize todas na borda **AO VIVO**.
 - **Gaveta de Chat Integrada**: Abra o chat da live escolhida na lateral ou em janela *pop-out*.

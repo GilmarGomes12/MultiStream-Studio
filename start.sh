@@ -5,7 +5,15 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROFILE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/multistream-hub/profile"
 mkdir -p "$PROFILE_DIR"
 
-# 1. Inicia um servidor HTTP em Python em background apenas se a porta não estiver em uso
+# 1. Garante que o servidor HTTP na porta 8765 esteja servindo ESTA pasta ($DIR)
+EXISTING_PID=$(pgrep -f "python3 -m http.server $PORT" || true)
+if [[ -n "$EXISTING_PID" ]]; then
+    if ! ps -p "$EXISTING_PID" -o args= 2>/dev/null | grep -Fq -- "--directory $DIR"; then
+        kill $EXISTING_PID 2>/dev/null || true
+        sleep 0.2
+    fi
+fi
+
 if ! lsof -i :$PORT > /dev/null 2>&1 && ! ss -tuln | grep -q ":$PORT "; then
     python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$DIR" > /dev/null 2>&1 &
     SERVER_PID=$!
@@ -30,12 +38,13 @@ else
     exit 1
 fi
 
-# 3. Abre em modo App com perfil isolado (permite roteamento individual de áudio no PipeWire/PulseAudio)
+# 3. Abre em modo App com perfil isolado (permite roteamento individual de áudio e sessão persistente do YouTube)
 "$BROWSER" \
   --app="http://localhost:$PORT/index.html" \
   --user-data-dir="$PROFILE_DIR" \
   --class="MultiStreamHub" \
   --window-size=1600,900 \
+  --disable-features=ThirdPartyStoragePartitioning,TrackingProtection3pcd \
   --autoplay-policy=no-user-gesture-required > /dev/null 2>&1
 
 # 4. Encerra o servidor local ao fechar a janela

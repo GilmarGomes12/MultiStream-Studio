@@ -1,4 +1,4 @@
-const CACHE_NAME = 'multistream-hub-v1';
+const CACHE_NAME = 'multistream-hub-v2';
 const ASSETS = [
   './',
   './index.html',
